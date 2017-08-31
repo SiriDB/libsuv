@@ -4,5 +4,5 @@
 
 USER_OBJS :=
 
-LIBS := -lqpack
+LIBS := -lqpack -lsiridb
 

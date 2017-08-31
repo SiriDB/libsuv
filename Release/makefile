@@ -8,7 +8,6 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include src/subdir.mk
 -include subdir.mk
 -include objects.mk
 
@@ -20,22 +19,31 @@ endif
 
 -include ../makefile.defs
 
+OS := $(shell uname)
+ifeq ($(OS),Darwin)
+FN := libsuv.dylib
+INSTALL_PATH := /usr/local
+else
+FN := libsuv.so
+INSTALL_PATH := /usr
+endif
+
 # Add inputs and outputs from these tool invocations to the build variables
 
 # All Target
-all: libsiridb.so
+all: libsuv
 
 # Tool invocations
-libsiridb.so: $(OBJS) $(USER_OBJS)
+libsuv: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: Cross GCC Linker'
-	gcc -shared -o "libsiridb.so" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc -shared -o $(FN) $(OBJS) $(USER_OBJS) $(LIBS) $(LDFLAGS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(LIBRARIES)$(OBJS)$(C_DEPS) libsiridb.so
+	-$(RM) $(LIBRARIES)$(OBJS)$(C_DEPS) $(FN)
 	-@echo ' '
 
 .PHONY: all clean dependents

@@ -8,6 +8,21 @@
 #ifndef SUV_H_
 #define SUV_H_
 
+#define SUV_VERSION_MAJOR 0
+#define SUV_VERSION_MINOR 1
+#define SUV_VERSION_PATCH 0
+
+#define SUV_STRINGIFY(num) #num
+#define SUV_VERSION_STR(major,minor,patch)   \
+    SUV_STRINGIFY(major) "."                 \
+    SUV_STRINGIFY(minor) "."                 \
+    SUV_STRINGIFY(patch)
+
+#define SUV_VERSION SUV_VERSION_STR(          \
+        SUV_VERSION_MAJOR,                   \
+        SUV_VERSION_MINOR,                   \
+        SUV_VERSION_PATCH)
+
 #include <stdlib.h>
 #include <uv.h>
 #include <libsiridb/siridb.h>
@@ -55,8 +70,10 @@ suv_insert_t * suv_insert_create(
     size_t n);
 void suv_insert_destroy(suv_insert_t * insert);
 void suv_insert(suv_insert_t * insert);
+
 const char * suv_strerror(int err_code);
 const char * suv_errproto(uint8_t tp);
+const char * suv_version(void);
 
 #ifdef __cplusplus
 }
@@ -72,7 +89,6 @@ struct suv_buf_s
     size_t len;
     size_t size;
     siridb_t * siridb;
-    uv_tcp_t * tcp;
 };
 
 struct suv_write_s

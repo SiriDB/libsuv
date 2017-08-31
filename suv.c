@@ -20,6 +20,14 @@ static void suv__connect_cb(uv_connect_t * uvreq, int status);
 const long int MAX_PKG_SIZE = 209715200; // can be changed to anything you want
 
 /*
+ * Return libsuv version info.
+ */
+inline const char * suv_version(void)
+{
+    return SUV_VERSION;
+}
+
+/*
  * Create and returns a buffer object or NULL in case of an allocation error.
  */
 suv_buf_t * suv_buf_create(siridb_t * siridb)
@@ -33,7 +41,6 @@ suv_buf_t * suv_buf_create(siridb_t * siridb)
         suvbf->buf = NULL;
         suvbf->onclose = NULL;
         suvbf->onerror = NULL;
-        suvbf->tcp = NULL;
     }
     return suvbf;
 }
@@ -43,7 +50,8 @@ suv_buf_t * suv_buf_create(siridb_t * siridb)
  */
 void suv_buf_destroy(suv_buf_t * suvbf)
 {
-    if (suvbf->tcp != NULL)
+    uv_tcp_t * tcp_ = (uv_tcp_t *) suvbf->siridb->data;
+    if (tcp_ != NULL)
     {
         suv_close(suvbf, NULL);
     }
@@ -95,7 +103,8 @@ void suv_connect(
     struct sockaddr * addr)
 {
     assert (connect->_req->data == connect);  /* bind connect to req->data */
-    assert (buf->tcp == NULL);  /* do not call connect when connected */
+    assert (buf->siridb->data == NULL);  /* siridb data should be null, maybe
+                                            the connection is still in use? */
 
     uv_connect_t * uvreq = (uv_connect_t *) malloc(sizeof(uv_connect_t));
     if (uvreq == NULL)
@@ -104,20 +113,20 @@ void suv_connect(
         return;
     }
 
-    buf->tcp = (uv_tcp_t *) malloc(sizeof(uv_tcp_t));
-    if (buf->tcp == NULL)
+    uv_tcp_t * tcp_ = (uv_tcp_t *) malloc(sizeof(uv_tcp_t));
+    if (tcp_ == NULL)
     {
         suv_write_error((suv_write_t *) connect, ERR_MEM_ALLOC);
         return;
     }
 
-    buf->tcp->data = (void *) buf;
-    buf->siridb->data = (void *) buf->tcp;
+    tcp_->data = (void *) buf;
+    buf->siridb->data = (void *) tcp_;
 
-    uv_tcp_init(loop, buf->tcp);
+    uv_tcp_init(loop, tcp_);
 
     uvreq->data = (void *) connect->_req;
-    uv_tcp_connect(uvreq, buf->tcp, addr, suv__connect_cb);
+    uv_tcp_connect(uvreq, tcp_, addr, suv__connect_cb);
 }
 
 /*
@@ -125,13 +134,14 @@ void suv_connect(
  */
 void suv_close(suv_buf_t * buf, const char * msg)
 {
-    if (!uv_is_closing((uv_handle_t *) buf->tcp))
+    uv_tcp_t * tcp_ = (uv_tcp_t *) buf->siridb->data;
+    if (!uv_is_closing((uv_handle_t *) tcp_))
     {
         if (buf->onclose != NULL)
         {
             buf->onclose(buf->data, (msg == NULL) ? "connection closed" : msg);
         }
-        uv_close((uv_handle_t *) buf->tcp, suv__close_tcp);
+        uv_close((uv_handle_t *) tcp_, suv__close_tcp);
     }
 }
 
@@ -236,7 +246,7 @@ static void suv__close_tcp(uv_handle_t * tcp)
     if (tcp->data != NULL)
     {
         suv_buf_t * buf = (suv_buf_t *) tcp->data;
-        buf->tcp = NULL;
+        buf->siridb->data = NULL;
     }
     free(tcp);
 }

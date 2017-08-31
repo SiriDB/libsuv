@@ -1,9 +1,7 @@
 /*
  * main.c
- *    SiriDB C-Connector example. Feel free to use/edit suv.c and suv.h in case
- *    you want to connect to SiriDB using libuv. This example is created so
- *    that the main file contains only real exampe code and the suv.c and suv.h
- *    file can be re-used for any libuv project.
+ *    SiriDB C-Connector example using libsuv. This is a quite large example
+ *    since we try to cover most features from libsiridb and libsuv.
  *
  *  WARNING:
  *     Be carefull runing this example since it will query and insert data into
@@ -11,9 +9,9 @@
  *
  *  Compile using:
  *
- *     gcc main.c suv.c -luv -lqpack -lsiridb -o example.out
+ *     gcc main.c -lsuv -lsiridb -lqpack -luv -o example.out
  *
- *  Created on: Jun 09, 2017
+ *  Created on: Aug 31, 2017
  *      Author: Jeroen van der Heijden <jeroen@transceptor.technology>
  */
 
@@ -27,15 +25,14 @@
 #include <suv.h>
 
 static uv_loop_t loop;
-static uv_tcp_t tcp;
 
 /* Change this values to your needs */
-const char * SERVER = "127.0.0.1";
-const int PORT = 9000;
-const char * USER = "iris";
-const char * PASSWD = "siri";
-const char * DBNAME = "dbtest";
-const char * QUERY = "select * from /.*/";
+const char * SERVER     = "127.0.0.1";
+const int    PORT       = 9000;
+const char * USER       = "iris";
+const char * PASSWD     = "siri";
+const char * DBNAME     = "dbtest";
+const char * QUERY      = "show";
 
 static void connect_cb(siridb_req_t * req);
 static void query_cb(siridb_req_t * req);
@@ -50,9 +47,17 @@ static void print_count(uint64_t count);
 static void print_calc(uint64_t calc);
 static void print_show(siridb_show_t * show);
 static void print_msg(const char * msg);
+static void on_close(void * data, const char * msg);
+static void on_error(void * data, const char * msg);
 
 int main(void)
 {
+    printf("Running example using:\n"
+           " - libqpack %s\n"
+           " - libsiridb %s\n"
+           " - libsuv %s\n"
+           "\n", qp_version(), siridb_version(), suv_version());
+
     struct sockaddr_in addr;
     char * query = strdup(QUERY);
 
@@ -62,9 +67,14 @@ int main(void)
 
     siridb_t * siridb = siridb_create();
     /* handle siridb == NULL */
+    /* Warning: do not use siridb->data since it will be used by libsuv */
 
     suv_buf_t * buf = suv_buf_create(siridb);
     /* handle buf == NULL */
+
+    /* set optional callback functions */
+    buf->onclose = on_close;
+    buf->onerror = on_error;
 
     siridb_req_t * req = siridb_req_create(siridb, connect_cb, NULL);
     /* handle req == NULL */
@@ -76,10 +86,7 @@ int main(void)
     connect->data = (void *) query;
     req->data = (void *) connect;
 
-    uv_tcp_init(&loop, &tcp);
-
-    /* warn: this overwrites tcp->data so do not use the property yourself */
-    suv_connect(connect, buf, &tcp, (struct sockaddr *) &addr);
+    suv_connect(&loop, connect, buf, (struct sockaddr *) &addr);
 
     uv_run(&loop, UV_RUN_DEFAULT);
 
@@ -132,8 +139,14 @@ static void query_cb(siridb_req_t * req)
     }
     else
     {
+        /* We can get the output as a JSON string... */
+        char * json = qp_sprint(req->pkg->data, req->pkg->len);
+        printf("Response as JSON:\n%s\n\n", json);
+        free(json);
+
+        /* ..or get a nice response object */
         siridb_resp_t * resp = siridb_resp_create(req->pkg, NULL);
-        /* handle resp == NULL or us rc code for details */
+        /* handle resp == NULL or use rc code for details */
         print_resp(resp);
 
         siridb_resp_destroy(resp);
@@ -158,7 +171,7 @@ static void insert_cb(siridb_req_t * req)
     else
     {
         siridb_resp_t * resp = siridb_resp_create(req->pkg, NULL);
-        /* handle resp == NULL or us rc code for details */
+        /* handle resp == NULL or use rc code for details */
         print_resp(resp);
 
         siridb_resp_destroy(resp);
@@ -167,14 +180,12 @@ static void insert_cb(siridb_req_t * req)
     /* destroy suv_insert_t */
     suv_insert_destroy((suv_insert_t *) req->data);
 
+    /* here we quit the example by closing the handle */
+    uv_tcp_t * tcp_ = (uv_tcp_t *) req->siridb->data;
+    suv_close((suv_buf_t *) tcp_->data, NULL);
+
     /* destroy siridb request */
     siridb_req_destroy(req);
-
-    /* here we quit the example by closing the handle */
-    if (!uv_is_closing((uv_handle_t *) &tcp))
-    {
-        uv_close((uv_handle_t *) &tcp, NULL);
-    }
 }
 
 static void insert_example(siridb_t * siridb)
@@ -240,6 +251,16 @@ static void send_example_query(siridb_t * siridb, const char * query)
 
     suv_query(suvquery);
     /* check query_cb for errors */
+}
+
+static void on_close(void * data, const char * msg)
+{
+    printf("%s\n", msg);
+}
+
+static void on_error(void * data, const char * msg)
+{
+    printf("got an error: %s\n", msg);
 }
 
 static void print_resp(siridb_resp_t * resp)
