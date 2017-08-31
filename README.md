@@ -1,9 +1,5 @@
-# SiriDB Connector (libsiridb) with libuv
+# SiriDB Connector using libuv and libsiridb.
 This example is written as an extension to libsiridb which we will call libsuv.
-It's up to you to decide if you want to install libsuv ([suv.h](#suv.h) /
-[suv.c](#suv.c)) as a library or just copy the files in your own project.
-
-This documentation contains the api exposed by libsuv.
 
 ---------------------------------------
   * [API](#api)
@@ -12,6 +8,7 @@ This documentation contains the api exposed by libsuv.
     * [suv_connect_t](#suv_connect_t)
     * [suv_query_t](#suv_query_t)
     * [suv_insert_t](#suv_insert_t)
+    * [Miscellaneous functions](#miscellaneous-functions)
 
 ---------------------------------------
 
@@ -32,9 +29,22 @@ Create and return a new buffer. A `siridb_t` instance is required.
 *Public members*
 - `void * suv_buf_t.data`: Space for user-defined arbitrary data. libsuv does
 not use this field.
+- `suv_cb onclose`: Can be set to an optional callback function which will be
+called when a connection is closed.
+- `suv_cb onerror`: Can be set to an optional callback function which will be
+called when the normal request callback (`siridb_on_pkg()`) returns with an error.
+
+#### `suv_buf_from_req(siridb_req_t * req)`
+Macro function to get the `suv_buf_t*` from a request.
 
 #### `void suv_buf_destroy(suv_buf_t * suvbf)`
 Cleanup a buffer. Call this function after the connection is closed.
+
+#### `void suv_close(suv_buf_t * buf, const char * msg)`
+Close a connection. As long as the buffer is not destroyed, the same `suv_buf_t`
+can be used again to create a new connection. Argument `msg` is allowed to be
+`NULL` in wich case the default message will be used. The message (or default message)
+will be parsed to the `suv_buf_t.onclose` callback function.
 
 ### `suv_write_t`
 General write type. Used to communicate with SiriDB.
@@ -66,21 +76,18 @@ Returns `NULL` in case of a memory allocation error.
 Cleaunp a connection handle. This function should be called from a request
 (`siridb_req_t`) callback function. Alias for `suv_write_destroy()`.
 
-#### `void suv_connect(suv_connect_t * connect, suv_buf_t * buf, uv_tcp_t * tcp, struct sockaddr * addr)`
+#### `void suv_connect(uv_loop_t * loop, suv_connect_t * connect, suv_buf_t * buf, struct sockaddr * addr)`
 Connect and authenticate to SiriDB.
 
->Warning: This function overwrites the members `buf->siridb->data` and `tcp->data` so
->you should not use these properties. Instead the public members `buf->data` and
+>Warning: This function overwrites the members `buf->siridb->data` so
+>you should not use this property. Instead the public members `buf->data` and
 >`connect->data` are available and safe to use.
 
 Example:
 ```c
-#include <uv.h>
-#include <libsiridb/siridb.h>
-#include "suv.h"
+#include <suv.h>
 
 uv_loop_t loop;
-uv_tcp_t tcp;
 
 void connect_cb(siridb_req_t * req)
 {
@@ -88,6 +95,8 @@ void connect_cb(siridb_req_t * req)
 
     if (req->status) {
         printf("connect or auth failed: %s\n", siridb_strerror(req->status));
+    } else if (req->pkg->tp != CprotoResAuthSuccess) {
+        printf("authentication failed (error %u)\n", req->pkg->tp);
     } else {
         // do something with the connection
     }
@@ -95,11 +104,11 @@ void connect_cb(siridb_req_t * req)
     /* cleanup connetion handle */
     suv_connect_destroy(connect);
 
+    /* lets stop the example */
+    suv_close(suv_buf_from_req(req), NULL);
+
     /* cleanup connection request */
     siridb_req_destroy(req);
-
-    /* lets stop the example */
-    uv_close((uv_handle_t *) &tcp, NULL);
 }
 
 int main(void)
@@ -126,11 +135,9 @@ int main(void)
     /* explicit bind the connect handle to the request. (this must be done!) */
     req->data = (void *) connect;
 
-    uv_tcp_init(&loop, &tcp);
-
     /* Warning: This overwrites tcp->data and siridb->data so do not use these
      *          members yourself. */
-    suv_connect(connect, buf, &tcp, (struct sockaddr *) &addr);
+    suv_connect(&loop, connect, buf, (struct sockaddr *) &addr);
 
     /* run the uv event loop */
     uv_run(&loop, UV_RUN_DEFAULT);
@@ -275,3 +282,15 @@ siridb_series_destroy(series[0]);
  * (a successful insert has a SIRIDB_RESP_TP_SUCCESS_MSG siridb_resp_t.tp) */
 suv_insert(handle);
 ```
+
+### Miscellaneous functions
+#### `const char * suv_strerror(int err_code)`
+Returns the error message for a given error code.
+
+#### `const char * suv_version(void)`
+Returns the version of libsuv.
+
+#### `const char * suv_errproto(uint8_t tp)`
+Returns a JSON compatible string for a package response type. Since not all
+return packages from SiriDB contain JSON data, this function can be used to
+add an appropriate JSON string to those responses which lack this data.

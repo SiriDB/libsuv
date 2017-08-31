@@ -75,6 +75,9 @@ const char * suv_strerror(int err_code);
 const char * suv_errproto(uint8_t tp);
 const char * suv_version(void);
 
+#define suv_buf_from_req(REQ__) \
+    ((suv_buf_t *) ((uv_tcp_t *) REQ__->siridb->data)->data)
+
 #ifdef __cplusplus
 }
 #endif

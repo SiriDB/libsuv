@@ -19,9 +19,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <uv.h>
-#include <qpack.h>
-#include <libsiridb/siridb.h>
 #include <suv.h>
 
 static uv_loop_t loop;
@@ -111,12 +108,24 @@ static void connect_cb(siridb_req_t * req)
     char * query = (char *) connect->data;
     if (req->status)
     {
-        printf("connect failed: %s\n", siridb_strerror(req->status));
+        printf("connect failed: %s\n", suv_strerror(req->status));
     }
     else
     {
-        /* connect and authentication was succesful, send query */
-        send_example_query(req->siridb, query);
+        switch (req->pkg->tp)
+        {
+        case CprotoResAuthSuccess:
+            send_example_query(req->siridb, query);
+            break;
+        case CprotoErrAuthCredentials:
+            printf("auth failed: invalid credentials\n");
+            break;
+        case CprotoErrAuthUnknownDb:
+            printf("auth failed: unknown database\n");
+            break;
+        default:
+            printf("auth failed: unknown error (%u)\n", req->pkg->tp);
+        }
     }
 
     /* free query string */
@@ -135,7 +144,7 @@ static void query_cb(siridb_req_t * req)
 
     if (req->status != 0)
     {
-        printf("error handling request: %s", siridb_strerror(req->status));
+        printf("error handling request: %s", suv_strerror(req->status));
     }
     else
     {
@@ -166,7 +175,7 @@ static void insert_cb(siridb_req_t * req)
 {
     if (req->status != 0)
     {
-        printf("error handling request: %s", siridb_strerror(req->status));
+        printf("error handling request: %s", suv_strerror(req->status));
     }
     else
     {
@@ -181,8 +190,7 @@ static void insert_cb(siridb_req_t * req)
     suv_insert_destroy((suv_insert_t *) req->data);
 
     /* here we quit the example by closing the handle */
-    uv_tcp_t * tcp_ = (uv_tcp_t *) req->siridb->data;
-    suv_close((suv_buf_t *) tcp_->data, NULL);
+    suv_close(suv_buf_from_req(req), NULL);
 
     /* destroy siridb request */
     siridb_req_destroy(req);
