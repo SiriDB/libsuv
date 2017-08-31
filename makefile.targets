@@ -1,0 +1,9 @@
+.PHONY: install
+install:
+	@cp ../suv.h $(INSTALL_PATH)/include/suv.h
+	@cp $(FN) $(INSTALL_PATH)/lib/$(FN)
+
+.PHONY: uninstall
+uninstall:
+	@rm -f $(INSTALL_PATH)/include/suv.h
+	@rm -f $(INSTALL_PATH)/lib/$(FN)
