@@ -289,8 +289,3 @@ Returns the error message for a given error code.
 
 #### `const char * suv_version(void)`
 Returns the version of libsuv.
-
-#### `const char * suv_errproto(uint8_t tp)`
-Returns a JSON compatible string for a package response type. Since not all
-return packages from SiriDB contain JSON data, this function can be used to
-add an appropriate JSON string to those responses which lack this data.

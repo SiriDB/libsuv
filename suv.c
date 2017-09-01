@@ -22,7 +22,7 @@ const long int MAX_PKG_SIZE = 209715200; // can be changed to anything you want
 /*
  * Return libsuv version info.
  */
-inline const char * suv_version(void)
+const char * suv_version(void)
 {
     return SUV_VERSION;
 }
@@ -277,42 +277,6 @@ const char * suv_strerror(int err_code)
 {
     return (err_code > 0) ?
             uv_strerror(-err_code) : siridb_strerror(err_code);
-}
-
-/*
- * Return JSON compatible text for a given package type.
- */
-const char * suv_errproto(uint8_t tp)
-{
-    switch (tp)
-    {
-    case CprotoResAuthSuccess:
-        return "{\"success_msg\":\"Successful authentication.\"}";
-    case CprotoResAck:
-        return "{\"success_msg\":\"Acknowledged.\"}";
-    case CprotoAckAdmin:
-        return "{\"success_msg\":\"Acknowledged.\"}";
-    case CprotoAckAdminData:
-        return "{\"success_msg\":\"Acknowledged.\"}";
-    case CprotoErr:
-        return "{\"error_msg\":\"General error.\"}";
-    case CprotoErrNotAuthenticated:
-        return "{\"error_msg\":\"Not authenticated.\"}";
-    case CprotoErrAuthCredentials:
-        return "{\"error_msg\":\"Invalid credentials.\"}";
-    case CprotoErrAuthUnknownDb:
-        return "{\"error_msg\":\"Unknown database.\"}";
-    case CprotoErrLoadingDb:
-        return "{\"error_msg\":\"Loading database.\"}";
-    case CprotoErrFile:
-        return "{\"error_msg\":\"Error returning file.\"}";
-    case CprotoErrAdmin:
-        return "{\"error_msg\":\"General service request error.\"}";
-    case CprotoErrAdminInvalidRequest:
-        return "{\"error_msg\":\"Invalid service request.\"}";
-    default:
-        return "{\"error_msg\":\"Unknown error.\"}";
-    }
 }
 
 /*
