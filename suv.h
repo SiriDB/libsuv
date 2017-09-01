@@ -72,7 +72,6 @@ void suv_insert_destroy(suv_insert_t * insert);
 void suv_insert(suv_insert_t * insert);
 
 const char * suv_strerror(int err_code);
-const char * suv_errproto(uint8_t tp);
 const char * suv_version(void);
 
 #define suv_buf_from_req(REQ__) \
