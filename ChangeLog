@@ -1,3 +1,9 @@
+libsuv (0.1.2)
+
+  * Fixed bug in cleanup.
+
+ -- Jeroen van der Heijden <jeroen@transceptor.technology>  11 Sep 2017
+
 libsuv (0.1.1)
 
   * Cleanup connection when connect has failed.

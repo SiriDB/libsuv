@@ -103,8 +103,6 @@ void suv_connect(
     struct sockaddr * addr)
 {
     assert (connect->_req->data == connect);  /* bind connect to req->data */
-    assert (buf->siridb->data == NULL);  /* siridb data should be null, maybe
-                                            the connection is still in use? */
 
     uv_connect_t * uvreq = (uv_connect_t *) malloc(sizeof(uv_connect_t));
     if (uvreq == NULL)
@@ -135,13 +133,13 @@ void suv_connect(
 void suv_close(suv_buf_t * buf, const char * msg)
 {
     uv_tcp_t * tcp_ = (uv_tcp_t *) buf->siridb->data;
-    if (!uv_is_closing((uv_handle_t *) tcp_))
+    if (tcp_ != NULL && !uv_is_closing((uv_handle_t *) tcp_))
     {
         if (buf->onclose != NULL)
         {
             buf->onclose(buf->data, (msg == NULL) ? "connection closed" : msg);
         }
-        suv__close_tcp((uv_handle_t *) tcp_);
+        uv_close((uv_handle_t *) tcp_, suv__close_tcp);
     }
 }
 
@@ -246,9 +244,12 @@ static void suv__close_tcp(uv_handle_t * tcp)
     if (tcp->data != NULL)
     {
         suv_buf_t * buf = (suv_buf_t *) tcp->data;
-        buf->siridb->data = NULL;
+        if (tcp == (uv_handle_t *) buf->siridb->data)
+        {
+            buf->siridb->data = NULL;
+        }
     }
-    uv_close(tcp, (uv_close_cb) free);
+    free(tcp);
 }
 
 /*
@@ -318,7 +319,7 @@ static void suv__connect_cb(uv_connect_t * uvreq, int status)
     {
         /* error handling */
         suv_write_error((suv_write_t *) connect, -status);
-        suv__close_tcp((uv_handle_t *) connect->_req->siridb->data);
+        uv_close((uv_handle_t *) connect->_req->siridb->data, suv__close_tcp);
     }
     else
     {
@@ -326,7 +327,8 @@ static void suv__connect_cb(uv_connect_t * uvreq, int status)
         if (uvw == NULL)
         {
             suv_write_error((suv_write_t *) connect, ERR_MEM_ALLOC);
-            suv__close_tcp((uv_handle_t *) connect->_req->siridb->data);
+            uv_close(
+                (uv_handle_t *) connect->_req->siridb->data, suv__close_tcp);
         }
         else
         {
