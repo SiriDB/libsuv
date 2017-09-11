@@ -10,7 +10,7 @@
 
 #define SUV_VERSION_MAJOR 0
 #define SUV_VERSION_MINOR 1
-#define SUV_VERSION_PATCH 0
+#define SUV_VERSION_PATCH 1
 
 #define SUV_STRINGIFY(num) #num
 #define SUV_VERSION_STR(major,minor,patch)   \

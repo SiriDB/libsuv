@@ -141,7 +141,7 @@ void suv_close(suv_buf_t * buf, const char * msg)
         {
             buf->onclose(buf->data, (msg == NULL) ? "connection closed" : msg);
         }
-        uv_close((uv_handle_t *) tcp_, suv__close_tcp);
+        suv__close_tcp((uv_handle_t *) tcp_);
     }
 }
 
@@ -248,7 +248,7 @@ static void suv__close_tcp(uv_handle_t * tcp)
         suv_buf_t * buf = (suv_buf_t *) tcp->data;
         buf->siridb->data = NULL;
     }
-    free(tcp);
+    uv_close(tcp, (uv_close_cb) free);
 }
 
 /*
@@ -318,6 +318,7 @@ static void suv__connect_cb(uv_connect_t * uvreq, int status)
     {
         /* error handling */
         suv_write_error((suv_write_t *) connect, -status);
+        suv__close_tcp((uv_handle_t *) connect->_req->siridb->data);
     }
     else
     {
@@ -325,6 +326,7 @@ static void suv__connect_cb(uv_connect_t * uvreq, int status)
         if (uvw == NULL)
         {
             suv_write_error((suv_write_t *) connect, ERR_MEM_ALLOC);
+            suv__close_tcp((uv_handle_t *) connect->_req->siridb->data);
         }
         else
         {
